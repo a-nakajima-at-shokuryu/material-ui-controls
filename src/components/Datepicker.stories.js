@@ -18,7 +18,7 @@ export const Demo = () => {
         onChange={onChange}
         label="納品日"
       />
-      <div>{value}</div>
+      <pre>{JSON.stringify(value, null, 2)}</pre>
     </>
   );
 };

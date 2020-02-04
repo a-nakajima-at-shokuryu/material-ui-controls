@@ -1,125 +1,74 @@
-import React, { cloneElement, useCallback } from 'react';
-import {
-  KeyboardDatePicker as MuiDatePicker, 
-  MuiPickersUtilsProvider,
-} from '@material-ui/pickers';
+import React from 'react';
+import { MuiThemeProvider, createMuiTheme } from '@material-ui/core';
+import { KeyboardDatePicker, MuiPickersUtilsProvider } from '@material-ui/pickers';
 import DateFnsUtils from '@date-io/date-fns';
-import { ja } from 'date-fns/locale';
-import { useMuiTheme } from './muiTheme';
-import { Toolbar, makeStyles } from '@material-ui/core';
-import { isSameDay } from 'date-fns';
-import { useStyles as useDayStyles } from '@material-ui/pickers/views/Calendar/Day';
-import clsx from 'clsx'; 
+import ja from 'date-fns/locale/ja';
+import { isWeekend, isSameDay } from 'date-fns';
+import { pink, blue } from '@material-ui/core/colors';
 
-const isWeekend = date => {
-  const week = date.getDay();
-  return week === 0 || week === 6;
-};
-
-const CalendarToolbar = ({
-  date, 
-  ...other
-}) => {
-  const year = date.getFullYear(date);
-  const month = date.getMonth() + 1; 
-  const nn = n => ('00' + n).slice(-2);
-  const classes = useToolbarStyles(date);
+const withUtils = Component => props => {
+  ja.options.weekStartsOn = 0;
   return (
-    <Toolbar
-      className={classes.root}
-    >
-      {year}年{nn(month)}月
-    </Toolbar>
-  )
-}
-
-const useToolbarStyles = makeStyles(theme => {
-  const backgroundColor = date => {
-    return isWeekend(date) 
-      ? theme.palette.secondary.main
-      : theme.palette.primary.main; 
-  }
-  return {
-    root: {
-      backgroundColor: date => backgroundColor(date), 
-      color: date => theme.palette.getContrastText(backgroundColor(date))
-    }, 
-  };
-});
-
-const useWeekendDayComponent = () => {
-  const classes = {
-    ...useDayStyles(), 
-    ...useWeekendStyles(), 
-  };
-  return element => cloneElement(element, {
-    className: clsx(classes.day, {
-      [classes.current]: element.props.current, 
-      [classes.hidden]: element.props.hidden, 
-      [classes.daySelected]: element.props.selected, 
-      [classes.dayDisabled]: element.props.disabled, 
-      [classes.weekend]: true, 
-    }), 
-  })
+    <MuiPickersUtilsProvider utils={DateFnsUtils} locale={ja}>
+      <Component {...props} />
+    </MuiPickersUtilsProvider>
+  );
 };
 
-const useWeekendStyles = makeStyles(theme => {
-  return {
-    weekend: {
-      color: theme.palette.secondary.contrastText, 
-      backgroundColor: theme.palette.secondary.main, 
-      '&:hover': {
-        backgroundColor: theme.palette.secondary.light, 
+const switchTheme = date => {
+  const primaryColor = isWeekend(date) ? pink : blue;
+  return createMuiTheme({
+    palette: {
+      primary: primaryColor, 
+    }, 
+    overrides: {
+      MuiPickersDay: { 
+        current: {
+          color: blue[700], 
+        }
       }, 
-      '&:focus': {
-        backgroundColor: theme.palette.secondary.light, 
-      }, 
-    }
-  };
-});
-
-const withUtils = (children) => (
-  <MuiPickersUtilsProvider 
-    utils={DateFnsUtils}
-    locale={ja}
-  >
-    {children}
-  </MuiPickersUtilsProvider>
-);
+      MuiPickersCalendarHeader: {
+        dayLabel: {
+          '&:nth-child(1)': {
+            color: pink[700],  
+            fontWeight: 700, 
+          }, 
+          '&:nth-child(7)': {
+            color: pink[700],  
+            fontWeight: 700, 
+          }, 
+        }, 
+      },       
+    }, 
+  });
+};
+const renderDay = (day, selectedDate, dayInCurrentMonth, dayComponent) => {
+  const dayColor = !isSameDay(day, selectedDate) && isWeekend(day) ? pink[700] : undefined;
+  return React.cloneElement(dayComponent, {
+    style: {
+      color: dayColor,  
+    }, 
+  }); 
+}
 
 const Datepicker = ({
   value, 
   onChange, 
   ...other
 }) => {
-  ja.options.weekStartsOn = 0;
-
-  const handleChange = (_, value) => {
-    onChange(value);
-  }
-
-  const weekendDayComponent = useWeekendDayComponent();
-
-  const renderDay = (day, selectedDate, dayInCurrentMonth, dayComponent) => {
-    if (dayComponent.props.selected && isWeekend(day)) {
-      return weekendDayComponent(dayComponent);
-    }
-    return dayComponent;
-  }
-
-  return withUtils(
-    <MuiDatePicker
-      {...other}
-      variant="inline"
-      inputValue={value}
-      onChange={handleChange}
-      format="yyyy-MM-dd"
-      autoOk
-      ToolbarComponent={CalendarToolbar}
-      renderDay={renderDay}
-    />
-  );
+  return (
+    <MuiThemeProvider theme={switchTheme(value)}>
+      <KeyboardDatePicker
+        variant="inline"
+        format="yyyy-MM-dd"
+        autoOk
+        onChange={onChange}
+        value={value}
+        renderDay={renderDay}
+        {...other}
+      />
+    </MuiThemeProvider>
+  )
 }
 
-export default useMuiTheme(Datepicker);
-
+export default withUtils(Datepicker);
