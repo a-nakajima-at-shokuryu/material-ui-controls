@@ -1,54 +1,42 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { KeyboardDatePicker, MuiPickersUtilsProvider } from '@material-ui/pickers';
-import DateFnsUtils from '@date-io/date-fns';
-import ja from 'date-fns/locale/ja';
-import { getDay, isSameDay } from 'date-fns';
-import { MuiThemeProvider, createMuiTheme, useTheme } from '@material-ui/core';
+import DateFnsUtils from '@date-io/date-fns'; 
+import ja from 'date-fns/locale/ja'; 
 import { blue } from '@material-ui/core/colors';
+import { createMuiTheme, MuiThemeProvider, useTheme } from '@material-ui/core';
+import { getDay, isSameDay } from 'date-fns';
 
 const useUtilsProvider = (weekStartsOn) => {
-  useEffect(() => {
-    ja.options.weekStartsOn = weekStartsOn; 
-  }, [weekStartsOn]);
-  return element => (
+  useEffect(() => ja.options.weekStartsOn = weekStartsOn, [weekStartsOn]);
+  const utilsProvider = element => (
     <MuiPickersUtilsProvider utils={DateFnsUtils} locale={ja}>
       {element}
     </MuiPickersUtilsProvider>
   );
+  return utilsProvider;
 };
 
-const useThemeProvider = theme => {
-  return element => (
-    <MuiThemeProvider theme={theme}>
-      {element}
-    </MuiThemeProvider>
-  );
-};
-
-const useCreateTheme = (dayOfWeek, weekStartsOn) => {
+const useThemeProvider = (date, weekStartsOn) => {
+  const dayOfWeek = getDay(date);
   const theme = useTheme();
   const primaryMain = blue[700];
   const sundayColor = theme.palette.secondary.main;
-  const saturdayColor = theme.palette.success.dark; 
-  const getWeekColor = dayOfWeek => (
-    dayOfWeek === 0 ? sundayColor : (
-    dayOfWeek === 6 ? saturdayColor: (
-      undefined
-  )));
-  const weekColor = getWeekColor(dayOfWeek);
+  const saturdayColor = theme.palette.success.dark;
   const sundayPos = (0 - weekStartsOn + 7) % 7;
   const saturdayPos = (6 - weekStartsOn + 7) % 7;
-  const createTheme = () => createMuiTheme({
+  const getWeekColor = dayOfWeek => (
+    dayOfWeek === 0 ? sundayColor: (
+      dayOfWeek === 6 ? saturdayColor: undefined 
+      ));
+  const customedTheme = createMuiTheme({
     palette: {
       primary: {
-        main: weekColor || primaryMain, 
+        main: getWeekColor(dayOfWeek) || primaryMain, 
       }, 
     }, 
     overrides: {
       MuiPickersDay: {
-        current: {
-          color: primaryMain
-        }, 
+        current: { color: primaryMain }, 
       }, 
       MuiPickersCalendarHeader: {
         dayLabel: {
@@ -57,39 +45,43 @@ const useCreateTheme = (dayOfWeek, weekStartsOn) => {
         }, 
       }, 
     }, 
-  });
-  const renderDay = (day, selectedDate, dayInCurrentMonth, dayComponent) => {
-    const selected = isSameDay(day, selectedDate);
-    const dayColor = selected ? undefined : getWeekColor(getDay(day));
+  })
+  const themeProvider = element => (
+    <MuiThemeProvider theme={customedTheme}>
+      {element}
+    </MuiThemeProvider>
+  );
+  const renderDay = (date, selectedDate, dayInCurrentMonth, dayComponent) => {
+    const selected = isSameDay(date, selectedDate);
     return React.cloneElement(dayComponent, {
       style: {
-        color: dayColor,
-      },  
+        color: selected ? undefined : getWeekColor(getDay(date)),
+      }, 
     });
   };
-  return [createTheme, renderDay];
-};
+  return [themeProvider, renderDay];
+}; 
+
 const DatePickerField = ({
   value, 
   onChange, 
-  label="納品日", 
+  label = '納品日', 
   weekStartsOn = 0, 
   ...other
 }) => {
-  const dayOfWeek = useMemo(() => getDay(value), [value]);
-  const [createTheme, renderDay] = useCreateTheme(dayOfWeek, weekStartsOn);
-  const themeProvider = useThemeProvider(createTheme());
-  const utilsProvider = useUtilsProvider(weekStartsOn)
-  const all = (...a) => e => a.reduce((e, f) => f(e), e);
-  const provider = all(
+  
+  const [themeProvider, renderDay] = useThemeProvider(value, weekStartsOn);
+  const utilsProvider = useUtilsProvider(weekStartsOn);
+  const combineProvider = (...a) => e => a.reduce((e, f) => f(e), e);
+  const provider = combineProvider(
     themeProvider, 
     utilsProvider, 
-  );
+  )
   return provider(
-    <KeyboardDatePicker
+    <KeyboardDatePicker 
       variant="inline"
       format="yyyy-MM-dd"
-      autoOk 
+      autoOk
 
       renderDay={renderDay}
 
